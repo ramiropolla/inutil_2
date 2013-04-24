@@ -1,23 +1,25 @@
-#define BOTAO1   7
-#define BOTAO2   8
+#include <Servo.h>
+
+Servo sv;
+
+#define MOTOR_EN 3
+#define MOTOR_1  4
+#define MOTOR_2  8
+#define FIMDECUR 10
+#define SERVO    9
 #define SENSOR1  2
-#define SENSOR2  3
-#define MOTOR_EN 4
-#define MOTOR_1  5
-#define MOTOR_2  6
-#define FIMDECUR 9
+#define SENSOR2  6
 
 #define POS_MIN 0
-#define POS_MAX 3700
+#define POS_MAX 3500
 
 static boolean direction = false;
 static long count = 0;
 static int stop_at = -1;
+static boolean push_button = false;
 
 void setup()
 {
-    pinMode(BOTAO1  , INPUT );
-    pinMode(BOTAO2  , INPUT );
     pinMode(SENSOR1 , INPUT );
     pinMode(SENSOR2 , INPUT );
     pinMode(FIMDECUR, INPUT );
@@ -27,7 +29,10 @@ void setup()
 
     digitalWrite(MOTOR_EN, HIGH);
 
-    attachInterrupt(1, pulso, CHANGE);
+    attachInterrupt(0, pulso, CHANGE);
+
+    sv.attach(SERVO);
+    sv.write(0);
 
     Serial.begin(9600);
     Serial.println("STARTING");
@@ -68,11 +73,20 @@ static void motor_stall()
 
 void loop()
 {
-    static int ob1 = -1;
-    static int ob2 = -1;
-    byte b1 = digitalRead(BOTAO1  );
-    byte b2 = digitalRead(BOTAO2  );
     byte fc = digitalRead(FIMDECUR);
+
+    if (push_button) {
+        byte pos;
+        for(pos = 0; pos < 150; pos++) {
+            sv.write(pos);
+            delay(4);
+        }
+        delay(1000);
+        sv.write(0);
+        push_button = false;
+        Serial.print("finger ");
+        Serial.println(count);
+    }
 
     if (Serial.available()) {
         int pos = Serial.parseInt();
@@ -94,20 +108,11 @@ void loop()
         while (Serial.available()) { Serial.read(); }
     }
 
-    if (fc) {
+    if (fc && count) {
+        int cc = count;
+        Serial.print("fim de curso ");
+        Serial.println(cc);
         count = 0;
-    }
-
-    if (ob1 != b1 || ob2 != b2) {
-        if        (b1) {
-            motor_up();
-        } else if (b2) {
-            motor_down();
-        } else {
-            motor_stall();
-        }
-        ob1 = b1;
-        ob2 = b2;
     }
 }
 
@@ -121,6 +126,7 @@ void pulso()
 
     if ((count >= 0) && (stop_at >= 0) && (stop_at == count)) {
         motor_stall();
+        push_button = true;
     }
 }
 
